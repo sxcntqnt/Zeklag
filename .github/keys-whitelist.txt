@@ -1,0 +1,5 @@
+# Whitelisted public key fingerprints (SHA256)
+# Add trusted key fingerprints here to bypass validation
+
+# Example format (comment lines start with #):
+# sha256:abc123...def456
