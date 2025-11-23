@@ -1,0 +1,68 @@
+# .github/workflows/pre-merge-key-validation.yml
+name: Pre-merge Key Validation
+
+on:
+  pull_request:
+    paths:
+      - 'keys/**'
+      - '.github/keys-whitelist.txt'
+      - '.github/scripts/**'
+      - '.github/workflows/validate-keys.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-changes:
+    name: Validate Key Changes
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+
+    - name: Validate whitelist changes
+      id: whitelist-check
+      if: contains(github.event.pull_request.labels.*.name, 'security') || contains(github.event.head_commit.message, 'whitelist')
+      run: |
+        echo "🔒 Whitelist modification detected - requiring security review"
+        echo "WHITELIST_CHANGE=true" >> $GITHUB_ENV
+        
+        # Check if security team has approved
+        if [[ "${{ github.event.pull_request.requested_teams }}" != *"security-team"* ]]; then
+          echo "❌ Security team review required for whitelist changes"
+          exit 1
+        fi
+
+    - name: Install dependencies
+      run: |
+        pip install cryptography pyopenssl
+
+    - name: Validate keys against current whitelist
+      run: |
+        python .github/scripts/validate_keys.py \
+          --whitelist .github/keys-whitelist.txt \
+          --strict-whitelist
+
+    - name: Require security review for whitelist changes
+      if: env.WHITELIST_CHANGE == 'true'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '🔒 **Security Notice**: Whitelist modifications detected. This PR requires review from the security team before merging.'
+          })
+
+    - name: Block merge if security requirements not met
+      if: env.WHITELIST_CHANGE == 'true' && !contains(github.event.pull_request.labels.*.name, 'security-approved')
+      run: |
+        echo "❌ Cannot merge: Security approval required for whitelist changes"
+        exit 1
