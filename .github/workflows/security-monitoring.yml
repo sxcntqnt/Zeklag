@@ -1,0 +1,33 @@
+# .github/workflows/security-monitoring.yml
+name: Security Monitoring
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Hourly
+  push:
+    branches: [main]
+
+jobs:
+  monitor-whitelist:
+    name: Monitor Whitelist Changes
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Analyze recent whitelist changes
+      run: |
+        # Check last 10 commits for whitelist changes
+        git log -10 --oneline --name-only | grep -A5 -B5 "keys-whitelist.txt"
+        
+        # Alert if unexpected users modified whitelist
+        SUSPICIOUS_USERS=$(git log --pretty=format:"%an" -- .github/keys-whitelist.txt | sort | uniq)
+        EXPECTED_USERS="admin1 admin2 security-user"
+        
+        for user in $SUSPICIOUS_USERS; do
+          if [[ ! " $EXPECTED_USERS " =~ " $user " ]]; then
+            echo "🚨 Unexpected user modified whitelist: $user"
+            # Add notification logic here
+          fi
+        done
