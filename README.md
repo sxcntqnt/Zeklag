@@ -1,7 +1,7 @@
-# Zeklag
+# Zerilag
 SSH-KEYS DEPO
-keys/
-├── users/
+keys/\n
+├── users/\n
 │   ├── alice.pub
 │   ├── bob.pub
 │   └── carol.pub
